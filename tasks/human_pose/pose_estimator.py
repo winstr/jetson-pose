@@ -15,7 +15,7 @@ from torch2trt import TRTModule
 class PoseEstimator():
 
     DEVICE = torch.device('cuda')
-    IMG_SIZE = (224, 224)
+    IMG_SIZE = (256, 256)
     MEAN = torch.Tensor([0.485, 0.456, 0.406]).cuda()
     STD = torch.Tensor([0.229, 0.224, 0.225]).cuda()
 
@@ -29,7 +29,7 @@ class PoseEstimator():
     
     @staticmethod
     def get_model():
-        weight_file = 'resnet18_baseline_att_224x224_A_epoch_249_trt.pth'
+        weight_file = 'weights/densenet121_baseline_att_256x256_B_epoch_160_trt.pth'
         model = TRTModule()
         model.load_state_dict(torch.load(weight_file))
         return model
