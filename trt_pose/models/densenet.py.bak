@@ -30,42 +30,44 @@ def _densenet_pose_att(cmap_channels, paf_channels, upsample_channels, densenet,
     return model
 
     
-def densenet121_baseline(cmap_channels, paf_channels, upsample_channels=256, pretrained=True, num_upsample=3, num_flat=0):
-    densenet = torchvision.models.densenet121(pretrained=pretrained)
+def densenet121_baseline(cmap_channels, paf_channels, upsample_channels=256, weights='DenseNet121_Weights.DEFAULT', num_upsample=3, num_flat=0):
+    densenet = torchvision.models.densenet121(weights=weights)
     return _densenet_pose(cmap_channels, paf_channels, upsample_channels, densenet, 1024, num_upsample, num_flat)
 
 
-def densenet169_baseline(cmap_channels, paf_channels, upsample_channels=256, pretrained=True, num_upsample=3, num_flat=0):
-    densenet = torchvision.models.densenet169(pretrained=pretrained)
+def densenet169_baseline(cmap_channels, paf_channels, upsample_channels=256, weights='DenseNet169_Weights.DEFAULT', num_upsample=3, num_flat=0):
+    densenet = torchvision.models.densenet169(weights=weights)
     return _densenet_pose(cmap_channels, paf_channels, upsample_channels, densenet, 1664, num_upsample, num_flat)
 
 
-def densenet201_baseline(cmap_channels, paf_channels, upsample_channels=256, pretrained=True, num_upsample=3, num_flat=0):
-    densenet = torchvision.models.densenet201(pretrained=pretrained)
+def densenet201_baseline(cmap_channels, paf_channels, upsample_channels=256, weights='DenseNet201_Weights.DEFAULT', num_upsample=3, num_flat=0):
+    densenet = torchvision.models.densenet201(weights=weights)
     return _densenet_pose(cmap_channels, paf_channels, upsample_channels, densenet, 1920, num_upsample, num_flat)
 
 
-def densenet161_baseline(cmap_channels, paf_channels, upsample_channels=256, pretrained=True, num_upsample=3, num_flat=0):
-    densenet = torchvision.models.densenet161(pretrained=pretrained)
+def densenet161_baseline(cmap_channels, paf_channels, upsample_channels=256, weights='DenseNet161_Weights.DEFAULT', num_upsample=3, num_flat=0):
+    densenet = torchvision.models.densenet161(weights=weights)
     return _densenet_pose(cmap_channels, paf_channels, upsample_channels, densenet, 2208, num_upsample, num_flat)
 
 
     
-def densenet121_baseline_att(cmap_channels, paf_channels, upsample_channels=256, pretrained=True, num_upsample=3, num_flat=0):
-    densenet = torchvision.models.densenet121(pretrained=pretrained)
+def densenet121_baseline_att(cmap_channels, paf_channels, upsample_channels=256, weights='DenseNet121_Weights.DEFAULT', num_upsample=3, num_flat=0):
+    densenet = torchvision.models.densenet121(weights=weights)
     return _densenet_pose_att(cmap_channels, paf_channels, upsample_channels, densenet, 1024, num_upsample, num_flat)
 
 
-def densenet169_baseline_att(cmap_channels, paf_channels, upsample_channels=256, pretrained=True, num_upsample=3, num_flat=0):
-    densenet = torchvision.models.densenet169(pretrained=pretrained)
+def densenet169_baseline_att(cmap_channels, paf_channels, upsample_channels=256, weights='DenseNet169_Weights.DEFAULT', num_upsample=3, num_flat=0):
+    densenet = torchvision.models.densenet169(weights=weights)
     return _densenet_pose_att(cmap_channels, paf_channels, upsample_channels, densenet, 1664, num_upsample, num_flat)
 
 
-def densenet201_baseline_att(cmap_channels, paf_channels, upsample_channels=256, pretrained=True, num_upsample=3, num_flat=0):
-    densenet = torchvision.models.densenet201(pretrained=pretrained)
+def densenet201_baseline_att(cmap_channels, paf_channels, upsample_channels=256, weights='DenseNet201_Weights.DEFAULT', num_upsample=3, num_flat=0):
+    densenet = torchvision.models.densenet201(weights=weights)
     return _densenet_pose_att(cmap_channels, paf_channels, upsample_channels, densenet, 1920, num_upsample, num_flat)
 
 
-def densenet161_baseline_att(cmap_channels, paf_channels, upsample_channels=256, pretrained=True, num_upsample=3, num_flat=0):
-    densenet = torchvision.models.densenet161(pretrained=pretrained)
+def densenet161_baseline_att(cmap_channels, paf_channels, upsample_channels=256, weights='DenseNet161_Weights.DEFAULT', num_upsample=3, num_flat=0):
+    densenet = torchvision.models.densenet161(weights=weights)
     return _densenet_pose_att(cmap_channels, paf_channels, upsample_channels, densenet, 2208, num_upsample, num_flat)
+
+
