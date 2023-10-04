@@ -40,4 +40,5 @@ if __name__ == '__main__':
     pth_files = [
         'weights/resnet18_baseline_att_224x224_A_epoch_249.pth',
         'weights/densenet121_baseline_att_256x256_B_epoch_160.pth',]
+    convert_to_trt(pth_files[0])
     convert_to_trt(pth_files[1])
