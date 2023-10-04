@@ -7,7 +7,7 @@ from trt_pose import models
 from torch2trt import torch2trt
 
 
-def convert(pth_file):
+def convert_to_trt(pth_file):
     if not os.path.isfile(pth_file):
         raise FileNotFoundError(pth_file)
     
@@ -37,7 +37,7 @@ def convert(pth_file):
 
 
 if __name__ == '__main__':
-    # resnet18 - https://drive.google.com/file/d/1XYDdCUdiF2xxx4rznmLb62SdOUZuoNbd/view
-    # densenet121 - https://drive.google.com/file/d/13FkJkx7evQ1WwP54UmdiDXWyFMY1OxDU/view
-    pth_file = 'weights/densenet121_baseline_att_256x256_B_epoch_160.pth'
-    convert(pth_file)
+    pth_files = [
+        'weights/resnet18_baseline_att_224x224_A_epoch_249.pth',
+        'weights/densenet121_baseline_att_256x256_B_epoch_160.pth',]
+    convert_to_trt(pth_files[0])
