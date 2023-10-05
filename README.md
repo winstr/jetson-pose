@@ -49,7 +49,7 @@ trt_pose는 NVIDIA Jetson에서 실시간으로 자세 추정(pose estimation)�
 ```bash
 cd /workspace/pose
 
-git clone https://github.com/NVIDIA-AI-IOT/trt_pose
+git clone https://github.com/winstr/trt_pose.git
 cd trt_pose
 python3 setup.py install
 ```
