@@ -1,5 +1,3 @@
-import time
-
 import cv2
 from flask import Flask, Response
 from flask import redirect, url_for
@@ -28,10 +26,14 @@ def gen_frames():
         if not ret:
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             continue
+
         frame = frame[h_gap:h_gap+s, w_gap:w_gap+s, :]
-        estimator.estimate(frame)
+        poses = estimator.parse_pose(frame)
+        for pose in poses:
+            for joint in pose:
+                x, y = joint
+                cv2.circle(frame, (x.item(), y.item()), 3, (0, 0, 255), 2)
         frame = cv2.resize(frame, (s, s))
-        time.sleep(0.3)
 
         ret, jpeg_frame = cv2.imencode('.jpg', frame)
         yield(b'--frame\r\n'

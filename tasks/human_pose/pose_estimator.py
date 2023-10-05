@@ -12,50 +12,40 @@ from torch2trt import TRTModule
 
 
 class PoseEstimator():
+
     DEVICE = torch.device('cuda')
     MEAN = torch.Tensor([0.485, 0.456, 0.406]).cuda()
     STD = torch.Tensor([0.229, 0.224, 0.225]).cuda()
 
     @staticmethod
     def get_topology():
-        json_file = 'human_pose.json'
-        with open(json_file, 'r') as f:
-            human_pose = json.load(f)
-        topology = coco.coco_category_to_topology(human_pose)
+        with open('human_pose.json', 'r') as f:
+            metadata = json.load(f)
+        topology = coco.coco_category_to_topology(metadata)
         return topology
 
-    def __init__(self, weight_file, img_width, img_height):
-        if not os.path.isfile(weight_file):
-            raise FileNotFoundError(weight_file)
-        self.weight_file = weight_file
-        self.img_size = (img_width, img_height)
+    def __init__(self, weight_file, input_img_width, input_img_height):
+        self.model = TRTModule()
+        self.model.load_state_dict(torch.load(weight_file))
+        self.input_img_size = (input_img_width, input_img_height)
+        self.parser = PoseParser(self.get_topology())
 
-        topology = self.get_topology()
-        self.model = self._load_model()
-        self.parse_obj = ParseObjects(topology)
-        self.draw_obj = DrawObjects(topology)
-
-    def _load_model(self):
-        model = TRTModule()
-        model.load_state_dict(torch.load(self.weight_file))
-        return model
-    
-    def _preprc(self, img):
+    def preproc(self, img):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, self.img_size)
+        img = cv2.resize(img, self.input_img_size)
         img = Image.fromarray(img)
         img = transforms.functional.to_tensor(img).to(PoseEstimator.DEVICE)
         img.sub_(PoseEstimator.MEAN[:, None, None])
         img.div_(PoseEstimator.STD[:, None, None])
         return img[None, ...]
 
-    def estimate(self, img):
-        data = self._preprc(img)
+    def parse_pose(self, img):
+        data = self.preproc(img)
         cmap, paf = self.model(data)
         cmap = cmap.detach().cpu()
         paf = paf.detach().cpu()
-        cnts, objs, peaks = self.parse_obj(cmap, paf)
-        self.draw_obj(img, cnts, objs, peaks)
+        poses = self.parser(img, cmap, paf)
+        return poses
 
 
 class PoseEstimatorResNet(PoseEstimator):
@@ -72,8 +62,15 @@ class PoseEstimatorDenseNet(PoseEstimator):
         super().__init__(weight_file, img_width, img_height)
 
 
-class ParseObjects(object):
-    def __init__(self, topology, cmap_threshold=0.05, link_threshold=0.05, cmap_window=5, line_integral_samples=7, max_num_parts=100, max_num_objects=100):
+class PoseParser():
+    def __init__(self,
+                 topology,
+                 cmap_threshold=0.05,
+                 link_threshold=0.05,
+                 cmap_window=5,
+                 line_integral_samples=7,
+                 max_num_parts=100,
+                 max_num_objects=100):
         self.topology = topology
         self.cmap_threshold = cmap_threshold
         self.link_threshold = link_threshold
@@ -82,68 +79,39 @@ class ParseObjects(object):
         self.max_num_parts = max_num_parts
         self.max_num_objects = max_num_objects
 
-    def __call__(self, cmap, paf):
-        peak_counts, peaks = plugins.find_peaks(cmap, self.cmap_threshold, self.cmap_window, self.max_num_parts)
-        normalized_peaks = plugins.refine_peaks(peak_counts, peaks, cmap, self.cmap_window)
-        score_graph = plugins.paf_score_graph(paf, self.topology, peak_counts, normalized_peaks, self.line_integral_samples)
-        connections = plugins.assignment(score_graph, self.topology, peak_counts, self.link_threshold)
-        object_counts, objects = plugins.connect_parts(connections, self.topology, peak_counts, self.max_num_objects)
-        return object_counts, objects, normalized_peaks
+    def __call__(self, img, cmap, paf):
+        num_objs, objs, norm_peaks = self._parse_object(cmap, paf)
+        kpts = self._parse_keypoints(img, num_objs, objs, norm_peaks)
+        return kpts
 
+    def _parse_object(self, cmap, paf):
+        num_peak, peaks = plugins.find_peaks(
+            cmap, self.cmap_threshold, self.cmap_window, self.max_num_parts)
+        norm_peaks = plugins.refine_peaks(
+            num_peak, peaks, cmap, self.cmap_window)
+        score_graph = plugins.paf_score_graph(
+            paf, self.topology, num_peak, norm_peaks, self.line_integral_samples)
+        connections = plugins.assignment(
+            score_graph, self.topology, num_peak, self.link_threshold)
+        num_objs, objs = plugins.connect_parts(
+            connections, self.topology, num_peak, self.max_num_objects)
+        return num_objs, objs, norm_peaks
 
-class DrawObjects(object):
-    def __init__(self, topology):
-        self.topology = topology
+    def _parse_keypoints(self, img, num_objs, objs, norm_peaks):
+        img_height, img_width = img.shape[:2]
 
-    def __call__(self, img, num_objs, objs, norm_peaks):
-        img_width, img_height = img.shape[:2][::-1]
-        num_objs = int(num_objs[0])
+        num_objs = num_objs.squeeze()
         objs = objs.squeeze()
         norm_peaks = norm_peaks.squeeze()
-        num_kpts = objs[0].size()[0]
-        kptss = torch.zeros(size=(num_objs, num_kpts, 2), dtype=torch.int16)
+
+        num_joints = objs[0].size()[0]  # 18
+        poses = torch.zeros(size=(num_objs, num_joints, 2), dtype=torch.int16)
         for i, obj in enumerate(objs):
-            for j in range(num_kpts):
+            for j in range(num_joints):
                 k = int(obj[j])
                 if k >= 0:
-                    y, x = norm_peaks[j][k]
-                    kptss[i, j, 0] = round(float(x) * img_width)
-                    kptss[i, j, 1] = round(float(y) * img_height)
-        return kptss
+                    joint_y, joint_x = norm_peaks[j][k]
+                    poses[i, j, 0] = round(float(joint_x) * img_width)
+                    poses[i, j, 1] = round(float(joint_y) * img_height)
 
-
-"""
-class DrawObjects(object):
-    def __init__(self, topology):
-        self.topology = topology
-
-    def __call__(self, image, object_counts, objects, normalized_peaks):
-        height, width = image.shape[:2]
-
-        count = int(object_counts[0])
-        K = self.topology.shape[0]
-        
-        for i in range(count):
-            color = (0, 255, 0)
-            obj = objects[0][i]
-            C = obj.shape[0]
-            for j in range(C):
-                k = int(obj[j])
-                if k >= 0:
-                    peak = normalized_peaks[0][j][k]
-                    x = round(float(peak[1]) * width)
-                    y = round(float(peak[0]) * height)
-                    cv2.circle(image, (x, y), 3, color, 2)
-
-            for k in range(K):
-                c_a = self.topology[k][2]
-                c_b = self.topology[k][3]
-                if obj[c_a] >= 0 and obj[c_b] >= 0:
-                    peak0 = normalized_peaks[0][c_a][obj[c_a]]
-                    peak1 = normalized_peaks[0][c_b][obj[c_b]]
-                    x0 = round(float(peak0[1]) * width)
-                    y0 = round(float(peak0[0]) * height)
-                    x1 = round(float(peak1[1]) * width)
-                    y1 = round(float(peak1[0]) * height)
-                    cv2.line(image, (x0, y0), (x1, y1), color, 2)
-"""
+        return poses
