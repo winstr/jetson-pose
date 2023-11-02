@@ -1,4 +1,3 @@
-import os
 import json
 
 import cv2
@@ -30,7 +29,7 @@ class PoseEstimator():
         self.input_img_size = (input_img_width, input_img_height)
         self.parser = PoseParser(self.get_topology())
 
-    def preproc(self, img):
+    def preprocess(self, img):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, self.input_img_size)
         img = Image.fromarray(img)
@@ -40,29 +39,16 @@ class PoseEstimator():
         return img[None, ...]
 
     def parse_pose(self, img):
-        data = self.preproc(img)
+        data = self.preprocess(img)
         cmap, paf = self.model(data)
         cmap = cmap.detach().cpu()
         paf = paf.detach().cpu()
-        poses = self.parser(img, cmap, paf)
+        poses = self.parser.parse_pose(img, cmap, paf)
         return poses
 
 
-class PoseEstimatorResNet(PoseEstimator):
-    def __init__(self):
-        weight_file = 'weights/resnet18_baseline_att_224x224_A_epoch_249_trt.pth'
-        img_width, img_height = (224, 224)
-        super().__init__(weight_file, img_width, img_height)
-
-
-class PoseEstimatorDenseNet(PoseEstimator):
-    def __init__(self):
-        weight_file = 'weights/densenet121_baseline_att_256x256_B_epoch_160_trt.pth'
-        img_width, img_height = (256, 256)
-        super().__init__(weight_file, img_width, img_height)
-
-
 class PoseParser():
+
     def __init__(self,
                  topology,
                  cmap_threshold=0.05,
@@ -79,9 +65,11 @@ class PoseParser():
         self.max_num_parts = max_num_parts
         self.max_num_objects = max_num_objects
 
-    def __call__(self, img, cmap, paf):
+    def parse_pose(self, img, cmap, paf):
         num_objs, objs, norm_peaks = self._parse_object(cmap, paf)
         kpts = self._parse_keypoints(img, num_objs, objs, norm_peaks)
+        # FIXME
+        # kpts = self._parse_keypoints_with_confidence_score(img, num_objs, objs, norm_peaks, cmap)
         return kpts
 
     def _parse_object(self, cmap, paf):
@@ -99,12 +87,10 @@ class PoseParser():
 
     def _parse_keypoints(self, img, num_objs, objs, norm_peaks):
         img_height, img_width = img.shape[:2]
-
         num_objs = num_objs.squeeze()
         objs = objs.squeeze()
         norm_peaks = norm_peaks.squeeze()
-
-        num_joints = objs[0].size()[0]  # 18
+        num_joints = objs[0].size()[0]  # 18 keypoints
         poses = torch.zeros(size=(num_objs, num_joints, 2), dtype=torch.int16)
         for i, obj in enumerate(objs):
             for j in range(num_joints):
@@ -113,5 +99,42 @@ class PoseParser():
                     joint_y, joint_x = norm_peaks[j][k]
                     poses[i, j, 0] = round(float(joint_x) * img_width)
                     poses[i, j, 1] = round(float(joint_y) * img_height)
-
         return poses
+
+    '''
+    # TODO
+    # FIXME
+    def _parse_keypoints_with_confidence_score(self, img, num_objs, objs, norm_peaks, cmap):
+        img_height, img_width = img.shape[:2]
+        num_objs = num_objs.squeeze()
+        objs = objs.squeeze()
+        norm_peaks = norm_peaks.squeeze()
+        num_joints = objs[0].size()[0]  # 18 keypoints
+        poses = torch.zeros(size=(num_objs, num_joints, 3), dtype=torch.float32)
+        for i, obj in enumerate(objs):
+            for j in range(num_joints):
+                k = int(obj[j])
+                if k >= 0:
+                    joint_y, joint_x = norm_peaks[j][k]
+                    poses[i, j, 0] = round(float(joint_x) * img_width)
+                    poses[i, j, 1] = round(float(joint_y) * img_height)
+                    poses[i, j, 2] = cmap[round(float(joint_y) * img_height),
+                                          round(float(joint_x) * img_width)]
+        return poses
+    '''
+
+
+class PoseEstimatorResNet(PoseEstimator):
+
+    def __init__(self):
+        weight_file = 'weights/resnet18_baseline_att_224x224_A_epoch_249_trt.pth'
+        img_width, img_height = (224, 224)
+        super().__init__(weight_file, img_width, img_height)
+
+
+class PoseEstimatorDenseNet(PoseEstimator):
+
+    def __init__(self):
+        weight_file = 'weights/densenet121_baseline_att_256x256_B_epoch_160_trt.pth'
+        img_width, img_height = (256, 256)
+        super().__init__(weight_file, img_width, img_height)
